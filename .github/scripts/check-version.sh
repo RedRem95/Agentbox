@@ -11,7 +11,7 @@ set -euo pipefail
 
 tag=${1:?usage: check-version.sh <tag>}
 version=${tag#v}
-cli_dir=${CLI_DIR:-cli}
+cli_dir=$(cd "${CLI_DIR:-cli}" && pwd)   # absolute: pip reads a bare "cli" as a PyPI package name
 fail() { echo "::error::$*" >&2; exit 1; }
 
 [[ "$tag" == v* ]] || fail "Tag $tag must start with v (e.g. v0.2.0)"

@@ -24,6 +24,11 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: ruff
         run: uvx ruff check cli
+      - name: Release version check works
+        # same script as the release workflow, against the current version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' cli/agentbox_cli/__init__.py)
+          .github/scripts/check-version.sh "v$version"
 
   test:
     name: Tests (Python ${{ matrix.python }})
