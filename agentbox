@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# agentbox wrapper – the only requirement on the host is Docker.
+#
+# The actual tool runs inside the agentbox image and talks to Docker through the socket.
+#
+#   ./agentbox init        create a config interactively
+#   ./agentbox up          start the stack
+#   ./agentbox --help      all commands
+#   ./agentbox pull        update the image for this wrapper version
+#   ./agentbox build       build the image locally (only in a repo checkout)
+#
+# The config (agentbox.yaml or -c <file>) must live below the current directory or $HOME.
+set -euo pipefail
+
+# Replaced by the release workflow; "dev" means: running from a checkout.
+AGENTBOX_VERSION="dev"
+IMAGE_REPO="ghcr.io/redrem95/agentbox"
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SOCK=${AGENTBOX_DOCKER_SOCK:-/var/run/docker.sock}
+
+if [[ -n "${AGENTBOX_IMAGE:-}" ]]; then
+  IMAGE=$AGENTBOX_IMAGE
+elif [[ "$AGENTBOX_VERSION" == dev && -f "$HERE/Dockerfile" ]]; then
+  IMAGE="agentbox:local"            # checkout: use a local build
+elif [[ "$AGENTBOX_VERSION" == dev ]]; then
+  IMAGE="$IMAGE_REPO:latest"
+else
+  IMAGE="$IMAGE_REPO:$AGENTBOX_VERSION"
+fi
+
+case "${1:-}" in
+  build)
+    shift
+    [[ -f "$HERE/Dockerfile" ]] || { echo "build only works in a repo checkout" >&2; exit 1; }
+    exec docker build -t "$IMAGE" "$@" "$HERE" ;;
+  pull)
+    exec docker pull "$IMAGE" ;;
+esac
+
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  if [[ "$IMAGE" == agentbox:local ]]; then
+    echo "Local image missing – building it once (takes a few minutes) …" >&2
+    docker build -t "$IMAGE" "$HERE"
+  else
+    docker pull "$IMAGE"
+  fi
+fi
+
+args=(run --rm -i
+  -v "$SOCK:/var/run/docker.sock"
+  -v "$PWD:$PWD" -w "$PWD"
+  -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e HOST_HOME="$HOME"
+  -e HOST_KVM="$([[ -e /dev/kvm ]] && echo 1 || echo 0)"
+  -e AGENTBOX_IMAGE="$IMAGE"
+  -e AGENTBOX_CONFIG
+  -e RUSTDESK_PASSWORD
+  --entrypoint /usr/local/bin/agentbox-cli)
+[[ -t 0 && -t 1 ]] && args+=(-t)
+# home: read SSH keys/.gitconfig (wizard), create the shared gh folder
+[[ -d "$HOME" && "$HOME" != "$PWD" ]] && args+=(-v "$HOME:$HOME")
+[[ -n "${SUDO_UID:-}" ]] && args+=(-e SUDO_UID -e SUDO_GID)
+# forward the SSH agent (private repos during detection)
+if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
+  args+=(-v "$SSH_AUTH_SOCK:/run/ssh-agent.sock" -e SSH_AUTH_SOCK=/run/ssh-agent.sock)
+fi
+
+exec docker "${args[@]}" "$IMAGE" "$@"

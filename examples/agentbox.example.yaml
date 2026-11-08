@@ -1,0 +1,111 @@
+# agentbox Config (YAML; JSON/TOML gehen auch)
+
+workdir: /src                 # Basisverzeichnis, Repos landen in /src/<reponame>
+
+# per-project: ein herdr-Workspace pro Repo (/src/travelrepo, /src/jourfold)
+# root:        ein Workspace in /src mit den Agenten unten
+layout: per-project
+
+# Standard-Agenten pro Workspace (erster im Root-Pane, weitere in eigenen Tabs)
+# bekannt: claude, codex, opencode, cline, gemini, qwen, shell
+agents: [claude]
+
+# Agenten setzen beim Start ihre letzte Session im Projekt fort (Default: true)
+resume: true
+
+# Optional: eigene Startbefehle (überschreiben auch den Resume-Default)
+agent_commands:
+  # claude: "claude --continue --dangerously-skip-permissions || claude --dangerously-skip-permissions"
+  cline: "cline"
+
+repos:
+  - git@github.com:DEINUSER/travelrepo.git
+  - url: git@github.com:DEINUSER/jourfold.git
+    branch: main
+    agents: [claude, codex]   # überschreibt "agents" für dieses Repo
+    setup: "dotnet restore"   # läuft nur nach dem ersten Clone, als dev
+
+packages:
+  tools: [dotnet, python, uv] # python, uv, dotnet, go, rust, java, bun
+  dotnet_channel: "9.0"       # mehrere: "8.0 9.0"
+  apt: [make]
+  npm: []
+  setup: |                    # beliebiges Script, läuft als root bei jedem Start
+    true
+
+user:
+  sudo: true                  # dev darf sudo ohne Passwort (z.B. für apt durch Agenten)
+
+git:
+  name: "Dein Name"
+  email: "du@example.com"
+  register_ssh_key_with_gh: false   # Container-Key per gh bei GitHub hinterlegen (Scope admin:public_key)
+
+ssh:
+  authorized_keys:
+    - "ssh-ed25519 AAAA... du@laptop"
+
+# Optionaler Desktop (Xvfb + Openbox) mit RustDesk – z.B. um GUI-Apps selbst zu testen.
+# Apps, die aus herdr gestartet werden, erscheinen dort (DISPLAY=:0).
+# Passwort: beim ersten `agentbox up` abgefragt (oder `agentbox set rustdesk-password`),
+# landet in der env_file, nie in dieser Config.
+desktop:
+  enabled: false
+  resolution: "1600x900"
+  rustdesk:
+    enabled: true
+    version: latest           # oder z.B. "1.4.2"
+    direct:                   # Direkt-IP-Zugriff (RustDesk-Client: <host-ip>:<port>)
+      enabled: true
+      port: 21118             # Port auf dem Host
+      bind: ""                # LAN-IP des Hosts (z.B. 192.168.1.10) = nur im LAN; leer = alle Interfaces
+    relay:                    # eigener Server (hbbs/hbbr); leer = öffentliche RustDesk-Server
+      id_server: ""           # z.B. rd.example.com
+      relay_server: ""        # z.B. rd.example.com:21117 (leer = vom ID-Server abgeleitet)
+      api_server: ""
+      key: ""                 # Inhalt von id_ed25519.pub des Servers
+
+# GitHub-Auth für gh und Agenten. Drei Varianten (gh auf dem Host wird nie gebraucht):
+#   1. nur im Container:   config_dir leer -> Credentials im Home-Volume; einmal ./agentbox login gh
+#   2. Ordner vom Host:    config_dir: ~/.agentbox/gh -> beliebiger Host-Ordner, mehrere Boxen teilen sich
+#                          den Login; befüllt wird er per ./agentbox login gh (gh läuft im Container)
+#      (vorhandenes Host-gh: config_dir: ~/.config/gh – klappt nicht unter macOS, dort liegt der Token im Keychain)
+#   3. Token:              GH_TOKEN=... in der env_file, kein Login nötig (hat Vorrang vor 1/2)
+github:
+  config_dir: ""
+
+# Android: SDK (ohne Emulator) in der Box, Emulatoren laufen in eigenen Containern.
+# Wird automatisch aktiv, sobald android.* oder container.android_emulators gesetzt ist.
+android:
+  sdk_packages: ["platform-tools", "platforms;android-35", "build-tools;35.0.0"]
+  # cmdline_tools_version: "13114758"
+  devices: []                 # zusätzliche adb-Ziele, z.B. ["host.docker.internal:5555"] für nativen Emulator auf dem Host
+  mcp: true                   # mobile-mcp bei allen Agenten registrieren
+
+# Weitere MCP-Server für alle Agenten (claude, codex, opencode, gemini)
+mcp_servers: {}
+#  context7: { command: npx, args: ["-y", "@upstash/context7-mcp"] }
+
+# Env-Variablen aus docker run, die auch in SSH-Shells verfügbar sein sollen
+env_passthrough: [ANTHROPIC_API_KEY, OPENAI_API_KEY, GH_TOKEN]
+
+# ---- Für ./agentbox auf dem Host: erzeugt daraus <name>.compose.yml und startet sie
+container:
+  name: agentbox
+  resources:                  # Limits der Box (weglassen = unbegrenzt)
+    memory: 8g                # Faustregel: 1g + 0.75g pro Agent (+2g bei Android/Gradle)
+    cpus: 4
+  # image: ghcr.io/redrem95/agentbox:<version>   # Standard: passend zur Tool-Version
+  ssh_port: 2222
+  src: ""                     # leer = Docker-Volume; oder Host-Pfad, z.B. ~/agentbox-src
+  env_file: .env              # API-Keys etc.
+  network: ""                 # leer = <name>-net
+  android_emulators:          # eigene Container (braucht /dev/kvm), automatisch per adb verbunden
+    - name: agentbox-emu
+      image: budtmo/docker-android:emulator_14.0
+      device: "Samsung Galaxy S10"
+      vnc_port: 6080          # Bildschirm unter http://localhost:6080 (nur lokal gebunden)
+      memory: 4g              # mind. 3g, besser 4g
+      cpus: 2
+  mounts:                     # host:container[:ro] – fehlende Host-Pfade werden übersprungen
+    - ~/.gitconfig:/home/dev/.gitconfig.host:ro

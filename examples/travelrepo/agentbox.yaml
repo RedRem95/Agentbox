@@ -1,0 +1,132 @@
+# Szenario: TravelRepo + Jourfold (inkl. Android) mit Phone- und Tablet-Emulator
+# Gesamt-Cap: 5 CPUs / 20 GB  (Box 2 CPU / 11 GB, je Emulator 1.5 CPU / 4.5 GB)
+#
+#   ./agentbox -c scenarios/travelrepo/agentbox.yaml check
+#   ./agentbox -c scenarios/travelrepo/agentbox.yaml up
+
+workdir: /src
+layout: root                  # ein herdr-Workspace in /src ...
+agents: [claude]              # ... mit genau einem Claude
+resume: true
+
+# Beide Repos nebeneinander: jourfold referenziert ../travelrepo per ProjectReference.
+# HTTPS klont öffentliche Repos ohne Key; Push läuft über gh (gh auth setup-git).
+# Reihenfolge wichtig: travelrepo zuerst (jourfold-Setup nutzt dessen libgit2-Buildscript).
+repos:
+  - url: https://github.com/travelrepo-org/travelrepo.git
+    setup: |
+      dotnet restore TravelRepo.sln
+  - url: https://github.com/travelrepo-org/jourfold.git
+    setup: |
+      # Android-Plattform/Build-Tools genau so, wie der .NET-Android-Workload sie erwartet
+      dotnet build src/Jourfold.Android -t:InstallAndroidDependencies \
+        -p:AndroidSdkDirectory="$ANDROID_HOME" -p:JavaSdkDirectory="$JAVA_HOME" -p:AcceptAndroidSDKLicenses=True
+      # libgit2 für Android (wie .github/workflows/android.yml) -> artifacts/libgit2-android
+      if [ ! -f artifacts/libgit2-android/x86_64/libgit2-5853918.so ]; then
+        tmp=$(mktemp -d)
+        git init -q "$tmp"
+        git -C "$tmp" fetch -q --depth 1 https://github.com/libgit2/libgit2.git 5853918c4c6a7b12f8becf4bd11ff4362ebb9020
+        git -C "$tmp" checkout -q FETCH_HEAD
+        ANDROID_NDK="$ANDROID_HOME/ndk/28.2.13676358" PATH="$ANDROID_HOME/cmake/3.31.6/bin:$PATH" \
+          sh ../travelrepo/eng/build-libgit2-android.sh "$tmp" artifacts/libgit2-android
+        rm -rf "$tmp"
+      fi
+      dotnet restore Jourfold.sln
+
+# Claude liest CLAUDE.md, die Repos nutzen AGENTS.md -> per Import verbinden
+files:
+  CLAUDE.md: |
+    # Workspace: TravelRepo + Jourfold
+
+    Zwei Repos nebeneinander in /src. Jourfold ist Client von TravelRepo und referenziert
+    ../travelrepo direkt als ProjectReference.
+
+    @travelrepo/AGENTS.md
+    @jourfold/AGENTS.md
+
+    ## Umgebung
+    - .NET SDK 10.0.401 (eng/sdk.json) inkl. android-Workload, JDK 21, Python 3.12 mit pyyaml
+    - Android-Emulatoren laufen in eigenen Containern und sind per adb verbunden:
+      travelbox-phone (Phone) und travelbox-tablet (Tablet). `adb devices` zeigt sie.
+    - APK bauen und installieren:
+      `dotnet build jourfold/src/Jourfold.Android -t:Install -p:AdbTarget="-s <serial>"`
+    - Für UI-Checks auf den Geräten steht der MCP-Server "mobile" zur Verfügung.
+    - CI-Schritte je Repo: restore --locked-mode, build -c Release, `dotnet format --verify-no-changes`,
+      test, `python eng/verify.py`.
+
+packages:
+  tools: [dotnet, python, uv]
+  dotnet_version: "10.0.401"          # eng/sdk.json beider Repos (global.json erlaubt latestFeature ab 10.0.100)
+  dotnet_workloads: [android]
+  python:
+    version: "3.12"
+    packages: ["pyyaml==6.0.2"]
+  apt: [libfontconfig1, fonts-dejavu-core, make]   # Avalonia Headless/Skia-Tests
+
+android:
+  jdk: 21
+  sdk_packages:
+    - platform-tools
+    - platforms;android-36
+    - build-tools;36.0.0
+    - ndk;28.2.13676358
+    - cmake;3.31.6
+  mcp: true
+
+# Optionaler Desktop (Xvfb + Openbox) mit RustDesk – z.B. um GUI-Apps selbst zu testen.
+# Apps, die aus herdr gestartet werden, erscheinen dort (DISPLAY=:0).
+# Passwort: beim ersten `agentbox up` abgefragt (oder `agentbox set rustdesk-password`),
+# landet in der env_file, nie in dieser Config.
+desktop:
+  enabled: false
+  resolution: "1600x900"
+  rustdesk:
+    enabled: true
+    version: latest           # oder z.B. "1.4.2"
+    direct:                   # Direkt-IP-Zugriff (RustDesk-Client: <host-ip>:<port>)
+      enabled: true
+      port: 21118             # Port auf dem Host
+      bind: ""                # LAN-IP des Hosts (z.B. 192.168.1.10) = nur im LAN; leer = alle Interfaces
+    relay:                    # eigener Server (hbbs/hbbr); leer = öffentliche RustDesk-Server
+      id_server: ""           # z.B. rd.example.com
+      relay_server: ""        # z.B. rd.example.com:21117 (leer = vom ID-Server abgeleitet)
+      api_server: ""
+      key: ""                 # Inhalt von id_ed25519.pub des Servers
+
+user:
+  sudo: true
+
+git:
+  name: "Dein Name"
+  email: "du@example.com"
+
+github:
+  config_dir: ""                      # Login nur im Container: ./agentbox login gh
+
+ssh:
+  authorized_keys:
+    - "ssh-ed25519 AAAA... du@laptop"
+
+env_passthrough: [GH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY]
+
+container:
+  name: travelbox
+  # image: ghcr.io/redrem95/agentbox:<version>   # Standard: passend zur Tool-Version
+  ssh_port: 2222
+  env_file: .env
+  resources:
+    memory: 11g
+    cpus: 2
+  android_emulators:
+    - name: travelbox-phone
+      image: budtmo/docker-android:emulator_14.0
+      device: "Samsung Galaxy S10"
+      vnc_port: 6080
+      memory: 4608m
+      cpus: 1.5
+    - name: travelbox-tablet
+      image: budtmo/docker-android:emulator_14.0
+      device: "Pixel C"
+      vnc_port: 6081
+      memory: 4608m
+      cpus: 1.5

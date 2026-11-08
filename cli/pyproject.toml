@@ -1,0 +1,29 @@
+[project]
+name = "agentbox"
+version = "0.1.0"
+description = "Agent-Boxen mit herdr, Repos, Toolchains und Android-Emulatoren aus einer Config"
+requires-python = ">=3.11"
+dependencies = ["ruamel.yaml>=0.17"]
+
+[project.scripts]
+agentbox = "agentbox_cli.main:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["agentbox_cli"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.ruff]
+line-length = 135
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

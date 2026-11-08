@@ -1,0 +1,27 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you run, what did you expect, what did you get?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of `./agentbox status` and the relevant part of `./agentbox logs --no-follow`. Remove anything secret.
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: Config (redacted)
+      render: yaml
+  - type: input
+    id: env
+    attributes:
+      label: Host
+      placeholder: e.g. Ubuntu 24.04 x86_64, Docker 28, agentbox 0.1.0

@@ -1,0 +1,12 @@
+.git
+.github
+**/.env
+**/*.compose.yml
+examples
+**/__pycache__
+**/*.egg-info
+cli/build
+cli/tests
+.venv
+**/.pytest_cache
+**/.ruff_cache

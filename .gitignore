@@ -1,0 +1,22 @@
+# secrets and generated files next to configs
+.env
+*.compose.yml
+
+# local herdr binary for offline builds
+image/vendor/herdr
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# editors / os
+.idea/
+.vscode/
+*.swp
+.DS_Store

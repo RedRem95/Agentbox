@@ -1,0 +1,101 @@
+name: Release
+
+# Push a tag like v0.2.0 (version must match cli/agentbox_cli/__init__.py and cli/pyproject.toml).
+# Builds and pushes ghcr.io/redrem95/agentbox and creates a GitHub release with the versioned wrapper.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ghcr.io/redrem95/agentbox
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          init=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' cli/agentbox_cli/__init__.py)
+          proj=$(sed -n 's/^version = "\(.*\)"$/\1/p' cli/pyproject.toml)
+          if [ "$tag" != "$init" ] || [ "$tag" != "$proj" ]; then
+            echo "::error::Tag $tag does not match __version__ ($init) / pyproject ($proj)"
+            exit 1
+          fi
+          echo "VERSION=$tag" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+          labels: |
+            org.opencontainers.image.title=agentbox
+            org.opencontainers.image.description=herdr server, coding agents, repos and toolchains from one config
+            org.opencontainers.image.licenses=MIT
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Versioned wrapper
+        run: |
+          mkdir -p dist
+          sed "s/^AGENTBOX_VERSION=\"dev\"$/AGENTBOX_VERSION=\"$VERSION\"/" agentbox > dist/agentbox
+          grep -q "^AGENTBOX_VERSION=\"$VERSION\"$" dist/agentbox
+          chmod +x dist/agentbox
+
+      - name: Release notes from CHANGELOG
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Release $VERSION" > notes.md
+          cat >> notes.md <<EOF
+
+          ## Install
+
+          \`\`\`bash
+          curl -fsSLo agentbox https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/agentbox
+          chmod +x agentbox && ./agentbox init
+          \`\`\`
+
+          or with uv: \`uvx --from "git+https://github.com/${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}#subdirectory=cli" agentbox init\`
+
+          Image: \`${IMAGE}:${VERSION}\`
+          EOF
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          case "$VERSION" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/agentbox \
+            --title "agentbox $VERSION" --notes-file notes.md $pre
