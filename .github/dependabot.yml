@@ -8,12 +8,18 @@ updates:
       actions:
         patterns: ["*"]
 
+  # Base image stays on a Node LTS line; major jumps are done by hand.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
 
+  # Lower bounds (>=) only move when they have to.
   - package-ecosystem: pip
     directory: /cli
     schedule:
       interval: weekly
+    versioning-strategy: increase-if-necessary
