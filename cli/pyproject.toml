@@ -3,7 +3,7 @@ name = "agentbox"
 version = "0.1.0"
 description = "Agent-Boxen mit herdr, Repos, Toolchains und Android-Emulatoren aus einer Config"
 requires-python = ">=3.11"
-dependencies = ["ruamel.yaml>=0.17"]
+dependencies = ["ruamel.yaml>=0.19.1"]
 
 [project.scripts]
 agentbox = "agentbox_cli.main:main"
