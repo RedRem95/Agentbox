@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: shellcheck
-        run: shellcheck -S warning agentbox image/*.sh
+        run: shellcheck -S warning agentbox image/*.sh .github/scripts/*.sh
       - uses: astral-sh/setup-uv@v7
       - name: ruff
         run: uvx ruff check cli

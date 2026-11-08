@@ -8,18 +8,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [0.1.0] - 2026-11-09
 
-First public version.
+The first public version. agentbox turns one YAML file into a dev box for coding agents:
+your repos side by side, the toolchains they need, agents running in a herdr server you can
+attach to over SSH, and optionally Android emulators and a desktop for GUI testing.
 
 ### Added
 
-- `agentbox` wrapper: Docker is the only host requirement; the tool runs inside the image.
-- `agentbox init`: interactive setup that clones the given repos, detects toolchains
-  (.NET SDK and workloads, JDK, Android SDK packages incl. NDK/CMake from CI workflows,
-  Python, Node, Rust, Go) and suggests a resource split.
-- `up`, `check`, `status`, `logs`, `stop`, `start`, `down`, `shell`, `login gh|claude`,
-  `set <secret>`, `pubkey`, `generate`.
-- Box image with herdr server, key-only SSH, per-config toolchains cached in a volume,
-  agent resume across restarts, MCP registration for claude/codex/opencode/gemini.
-- Android emulators in separate containers with automatic `adb` reconnects and mobile-mcp.
-- Optional desktop (Xvfb + Openbox) with RustDesk via LAN and/or own relay server.
-- RAM/CPU limits per container and a pre-flight check against the Docker host.
+- **Docker is the only host requirement.** The `agentbox` wrapper starts the tool from the image
+  and talks to Docker through the socket. `uvx` works as well if you prefer a native install.
+- **`agentbox init`** asks a handful of questions and writes the config. It clones your repos
+  shallowly to look at them and detects .NET SDKs and workloads, JDK, Android SDK packages
+  (including NDK and CMake versions from CI workflows), Python, Node, Rust and Go. It also orders
+  repos that reference each other and proposes a RAM/CPU split for the whole stack.
+- **Everyday commands:** `up`, `status`, `logs`, `stop`, `start`, `restart`, `down`, `shell`,
+  `check`, `pubkey`, `login gh|claude`, `set rustdesk-password|gh-token|claude-token`.
+- **The box:** herdr server with one workspace per repo or one for all, agents that resume their
+  last session after restarts, MCP servers registered for Claude Code, Codex, opencode and Gemini,
+  key-only SSH, toolchains installed from the config and cached in a volume.
+- **Android:** phone and tablet emulators in their own containers, kept connected over `adb`,
+  with mobile-mcp so agents can see and tap through the app.
+- **Desktop:** optional Xvfb/Openbox desktop with RustDesk, reachable from the LAN and/or through
+  your own relay server. The password is asked for once and kept in `.env`.
+- **Limits and pre-flight check:** memory and CPU limits per container, and a check that warns or
+  stops before the stack would overload the Docker host.
+- **Persistence:** sessions, logins, repos, SDKs and emulator data live in named volumes and
+  survive `up`, image updates and `down`.
+
+### Known limitations
+
+- Android emulators need a Linux x86_64 host with `/dev/kvm`.
+- The image is published for `linux/amd64` only.
+- The CLI talks German for now.
+
+[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/RedRem95/Agentbox/releases/tag/v0.1.0

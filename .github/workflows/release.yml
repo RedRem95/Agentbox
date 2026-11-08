@@ -2,6 +2,7 @@ name: Release
 
 # Push a tag like v0.2.0 (version must match cli/agentbox_cli/__init__.py and cli/pyproject.toml).
 # Builds and pushes ghcr.io/redrem95/agentbox and creates a GitHub release with the versioned wrapper.
+# Notes = CHANGELOG section + install block + GitHub's generated PR list (see .github/scripts/release-notes.sh).
 on:
   push:
     tags: ["v*.*.*"]
@@ -18,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # previous tag for the generated notes
 
       - name: Check version
         run: |
@@ -69,27 +72,12 @@ jobs:
           grep -q "^AGENTBOX_VERSION=\"$VERSION\"$" dist/agentbox
           chmod +x dist/agentbox
 
-      - name: Release notes from CHANGELOG
+      - name: Release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          awk -v v="$VERSION" '
-            $0 ~ "^## \\[" v "\\]" { on = 1; next }
-            on && /^## \[/ { exit }
-            on { print }
-          ' CHANGELOG.md > notes.md
-          [ -s notes.md ] || echo "Release $VERSION" > notes.md
-          cat >> notes.md <<EOF
-
-          ## Install
-
-          \`\`\`bash
-          curl -fsSLo agentbox https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/agentbox
-          chmod +x agentbox && ./agentbox init
-          \`\`\`
-
-          or with uv: \`uvx --from "git+https://github.com/${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}#subdirectory=cli" agentbox init\`
-
-          Image: \`${IMAGE}:${VERSION}\`
-          EOF
+          .github/scripts/release-notes.sh "$VERSION" "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" "$IMAGE" > notes.md
+          cat notes.md
 
       - name: Create release
         env:
