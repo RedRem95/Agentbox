@@ -1,6 +1,7 @@
 name: Release
 
-# Two ways to release – the version must match cli/agentbox_cli/__init__.py and cli/pyproject.toml:
+# Two ways to release – the tag must match the version in cli/pyproject.toml
+# (single source: __version__ in cli/agentbox_cli/__init__.py, checked by .github/scripts/check-version.sh):
 #   - push a tag like v0.2.0 (the release is created here), or
 #   - publish a release on github.com with a new tag v0.2.0 (your text is kept and completed here).
 #
@@ -66,15 +67,10 @@ jobs:
           fetch-depth: 0   # previous tag for the generated notes
 
       - name: Check version
+        # tag must be semver and match the version in cli/pyproject.toml, otherwise stop here
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          init=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' cli/agentbox_cli/__init__.py)
-          proj=$(sed -n 's/^version = "\(.*\)"$/\1/p' cli/pyproject.toml)
-          if [ "$tag" != "$init" ] || [ "$tag" != "$proj" ]; then
-            echo "::error::Tag $tag does not match __version__ ($init) / pyproject ($proj)"
-            exit 1
-          fi
-          echo "VERSION=$tag" >> "$GITHUB_ENV"
+          version=$(.github/scripts/check-version.sh "$GITHUB_REF_NAME")
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@v4
 

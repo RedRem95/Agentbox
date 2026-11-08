@@ -1,5 +1,7 @@
 import os
 
+# The only place for the version. Write it exactly like the release tag without "v":
+# 0.2.0 for v0.2.0, 0.2.0-rc.1 for v0.2.0-rc.1 (pip shows that as 0.2.0rc1, which is the same).
 __version__ = "0.1.0"
 
 # Published image; the wrapper passes AGENTBOX_IMAGE (e.g. a local dev build).

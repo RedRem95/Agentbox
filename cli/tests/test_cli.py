@@ -1,3 +1,5 @@
+import importlib.metadata
+
 import pytest
 
 from agentbox_cli import config as C
@@ -48,3 +50,11 @@ def test_get_keeps_false():
     assert C.get(d, "a.b", True) is False
     assert C.get(d, "a.c", "x") == "x"
     assert C.get(d, "a.zz.y", 1) == 1
+
+
+def test_version_single_source():
+    """pyproject.toml reads the version from __version__ (PEP 440 normalises 0.2.0-rc.1 to 0.2.0rc1)."""
+    from packaging.version import Version
+
+    from agentbox_cli import __version__
+    assert Version(importlib.metadata.version("agentbox")) == Version(__version__)
