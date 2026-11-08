@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 packages = ["agentbox_cli"]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=9.2.0"]
 
 [tool.ruff]
 line-length = 135
