@@ -1,17 +1,22 @@
 name: Release
 
-# Two ways to release (the version must match cli/agentbox_cli/__init__.py and cli/pyproject.toml):
-#   - push a tag like v0.2.0, or
-#   - publish a release on GitHub with a new tag v0.2.0 (leave the notes empty, they are filled in here).
-# Builds and pushes ghcr.io/redrem95/agentbox and creates/completes the GitHub release with the versioned wrapper.
-# Notes = CHANGELOG section + install block + GitHub's generated PR list (see .github/scripts/release-notes.sh).
+# Two ways to release – the version must match cli/agentbox_cli/__init__.py and cli/pyproject.toml:
+#   - push a tag like v0.2.0 (the release is created here), or
+#   - publish a release on github.com with a new tag v0.2.0 (your text is kept and completed here).
+#
+# Flow: the release is switched to pre-release first, then the image is built and pushed, the
+# versioned wrapper attached and the notes completed. Only at the very end it becomes the latest
+# release. If anything fails, it stays a pre-release. Versions with a dash (v0.2.0-rc.1) stay
+# pre-releases.
+# Notes = your text + CHANGELOG section + install block + GitHub's PR list
+# (see .github/scripts/release-notes.sh).
 on:
   push:
     tags: ["v*.*.*"]
   release:
     types: [published]
 
-# Publishing in the web UI fires both events; run them one after another, the second is a no-op update.
+# A release published in the web UI can also fire the tag push; never run two at once.
 concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
@@ -22,9 +27,38 @@ permissions:
 
 env:
   IMAGE: ghcr.io/redrem95/agentbox
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
+  prepare:
+    name: Mark as pre-release
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.mark.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: mark
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            author=$(gh release view "$tag" --json author --jq .author.login)
+            if [ "$GITHUB_EVENT_NAME" = push ] && [ "$author" != "github-actions[bot]" ]; then
+              echo "Release $tag was created on github.com – the release event run takes care of it."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            gh release edit "$tag" --prerelease
+          else
+            gh release create "$tag" --verify-tag --prerelease --title "agentbox ${tag#v}" \
+              --notes "<!-- agentbox:placeholder -->
+          Build is running, this text is replaced when it is done."
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
   release:
+    name: Build and publish
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -63,7 +97,7 @@ jobs:
             org.opencontainers.image.description=herdr server, coding agents, repos and toolchains from one config
             org.opencontainers.image.licenses=MIT
 
-      - name: Build and push
+      - name: Build and push image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -74,36 +108,28 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Versioned wrapper
+      - name: Attach versioned wrapper
         run: |
           mkdir -p dist
           sed "s/^AGENTBOX_VERSION=\"dev\"$/AGENTBOX_VERSION=\"$VERSION\"/" agentbox > dist/agentbox
           grep -q "^AGENTBOX_VERSION=\"$VERSION\"$" dist/agentbox
           chmod +x dist/agentbox
+          gh release upload "$GITHUB_REF_NAME" dist/agentbox --clobber
 
-      - name: Release notes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          .github/scripts/release-notes.sh "$VERSION" "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" "$IMAGE" > notes.md
-          cat notes.md
-
-      - name: Create or complete release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Complete release notes
         run: |
           tag="$GITHUB_REF_NAME"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            # created in the web UI (or by the other trigger): attach the wrapper,
-            # fill in notes and title only if they were left empty
-            gh release upload "$tag" dist/agentbox --clobber
-            body=$(gh release view "$tag" --json body --jq .body)
-            if [ -z "$(printf '%s' "$body" | tr -d '[:space:]')" ]; then
-              gh release edit "$tag" --notes-file notes.md --title "agentbox $VERSION"
-            fi
-          else
-            pre=""
-            case "$VERSION" in *-*) pre="--prerelease" ;; esac
-            gh release create "$tag" dist/agentbox \
-              --title "agentbox $VERSION" --notes-file notes.md $pre
-          fi
+          gh release view "$tag" --json body --jq .body > existing.md
+          EXISTING_NOTES=existing.md .github/scripts/release-notes.sh "$VERSION" "$tag" "$GITHUB_REPOSITORY" "$IMAGE" > notes.md
+          cat notes.md
+          # keep a title written in the web UI, otherwise use ours
+          title=$(gh release view "$tag" --json name --jq .name)
+          if [ -z "$title" ] || [ "$title" = "$tag" ]; then title="agentbox $VERSION"; fi
+          gh release edit "$tag" --notes-file notes.md --title "$title"
+
+      - name: Mark as latest release
+        run: |
+          case "$VERSION" in
+            *-*) echo "$VERSION is a pre-release version – stays a pre-release." ;;
+            *)   gh release edit "$GITHUB_REF_NAME" --prerelease=false --latest ;;
+          esac

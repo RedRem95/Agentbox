@@ -163,8 +163,18 @@ The repo layout:
 - `image/`: what runs inside the box (entrypoint, adb watcher, desktop)
 - `Dockerfile`: one image for both the box and the tool
 
-Releases are cut by pushing a tag `vX.Y.Z` that matches the version in `cli/`. CI then builds and
-pushes `ghcr.io/redrem95/agentbox` and attaches the wrapper to the GitHub release.
+### Releasing
+
+1. Set the version in `cli/agentbox_cli/__init__.py` and `cli/pyproject.toml`, and add a
+   `## [X.Y.Z]` section to `CHANGELOG.md`.
+2. Either push a tag `vX.Y.Z`, or publish a release on GitHub with a new tag `vX.Y.Z`.
+   If you write text in the web UI, it stays on top; the workflow adds whatever is missing.
+
+The release workflow first switches the release to pre-release, builds and pushes
+`ghcr.io/redrem95/agentbox`, attaches the versioned wrapper and completes the notes
+(changelog section, install block, list of merged PRs). Only then it becomes the latest release.
+If a step fails, the release stays a pre-release, so nobody downloads a half-finished one.
+Versions like `v0.2.0-rc.1` always stay pre-releases.
 
 The CLI currently talks German. English output is on the list.
 
