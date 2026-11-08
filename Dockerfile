@@ -1,6 +1,6 @@
 # agentbox image: herdr server, coding agents, repos and toolchains from one config.
 # Also contains the agentbox CLI (started by the ./agentbox wrapper on the host).
-FROM node:22-bookworm-slim
+FROM node:26-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
