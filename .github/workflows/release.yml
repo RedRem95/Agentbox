@@ -1,11 +1,20 @@
 name: Release
 
-# Push a tag like v0.2.0 (version must match cli/agentbox_cli/__init__.py and cli/pyproject.toml).
-# Builds and pushes ghcr.io/redrem95/agentbox and creates a GitHub release with the versioned wrapper.
+# Two ways to release (the version must match cli/agentbox_cli/__init__.py and cli/pyproject.toml):
+#   - push a tag like v0.2.0, or
+#   - publish a release on GitHub with a new tag v0.2.0 (leave the notes empty, they are filled in here).
+# Builds and pushes ghcr.io/redrem95/agentbox and creates/completes the GitHub release with the versioned wrapper.
 # Notes = CHANGELOG section + install block + GitHub's generated PR list (see .github/scripts/release-notes.sh).
 on:
   push:
     tags: ["v*.*.*"]
+  release:
+    types: [published]
+
+# Publishing in the web UI fires both events; run them one after another, the second is a no-op update.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -79,11 +88,22 @@ jobs:
           .github/scripts/release-notes.sh "$VERSION" "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" "$IMAGE" > notes.md
           cat notes.md
 
-      - name: Create release
+      - name: Create or complete release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          pre=""
-          case "$VERSION" in *-*) pre="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/agentbox \
-            --title "agentbox $VERSION" --notes-file notes.md $pre
+          tag="$GITHUB_REF_NAME"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # created in the web UI (or by the other trigger): attach the wrapper,
+            # fill in notes and title only if they were left empty
+            gh release upload "$tag" dist/agentbox --clobber
+            body=$(gh release view "$tag" --json body --jq .body)
+            if [ -z "$(printf '%s' "$body" | tr -d '[:space:]')" ]; then
+              gh release edit "$tag" --notes-file notes.md --title "agentbox $VERSION"
+            fi
+          else
+            pre=""
+            case "$VERSION" in *-*) pre="--prerelease" ;; esac
+            gh release create "$tag" dist/agentbox \
+              --title "agentbox $VERSION" --notes-file notes.md $pre
+          fi
