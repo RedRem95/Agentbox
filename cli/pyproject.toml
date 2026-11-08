@@ -9,7 +9,7 @@ dependencies = ["ruamel.yaml>=0.17"]
 agentbox = "agentbox_cli.main:main"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
