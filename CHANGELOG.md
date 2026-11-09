@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+### Fixed
+
+- `agentbox status` now shows the RustDesk ID and the box's warnings. It only read stdout of the
+  container log, but the box writes its messages to stderr. If the ID isn't in the log, it is
+  asked from RustDesk directly.
+
 ## [0.1.0] - 2026-11-09
 
 The first public version. agentbox turns one YAML file into a dev box for coding agents:

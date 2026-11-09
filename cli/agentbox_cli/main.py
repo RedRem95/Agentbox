@@ -124,7 +124,7 @@ def cmd_up(args) -> int:
     return 0
 
 
-def _hints(stack: Stack) -> None:
+def _hints(stack: Stack, rustdesk_id: str | None = None) -> None:
     host = "localhost" if stack.ssh_bind in ("", "127.0.0.1") else stack.ssh_bind
     print("\nLogs:       ./agentbox logs")
     print(f"Verbinden:  herdr --remote ssh://dev@{host}:{stack.ssh_port}")
@@ -132,22 +132,58 @@ def _hints(stack: Stack) -> None:
         if e.vnc_port:
             print(f"Emulator:   {e.name} -> http://localhost:{e.vnc_port}")
     if stack.rustdesk:
-        print("RustDesk:   ID mit `./agentbox status`" + (f", direkt: <host-ip>:{stack.rd_port}" if stack.rd_direct else ""))
+        direct = f", direkt: <host-ip>:{stack.rd_port}" if stack.rd_direct else ""
+        print(f"RustDesk:   ID {rustdesk_id}{direct}" if rustdesk_id else f"RustDesk:   ID mit `./agentbox status`{direct}")
+
+
+def _rustdesk_id(stack: Stack, logs: str) -> str | None:
+    found = [i for i in re.findall(r"RustDesk-ID: (\S+)", logs) if i.isdigit()]
+    if found:
+        return found[-1]
+    # nicht (mehr) im Log, z.B. weil RustDesk beim Start noch nicht bereit war: live fragen
+    out = docker.out("exec", "-u", "dev", "-e", "DISPLAY=:0", stack.name, "rustdesk", "--get-id")
+    digits = "".join(c for c in out if c.isdigit())
+    return digits or None
+
+
+def _hints(stack: Stack, rustdesk_id: str | None = None) -> None:
+    host = "localhost" if stack.ssh_bind in ("", "127.0.0.1") else stack.ssh_bind
+    print("\nLogs:       ./agentbox logs")
+    print(f"Verbinden:  herdr --remote ssh://dev@{host}:{stack.ssh_port}")
+    for e in stack.emulators:
+        if e.vnc_port:
+            print(f"Emulator:   {e.name} -> http://localhost:{e.vnc_port}")
+    if stack.rustdesk:
+        direct = f", direkt: <host-ip>:{stack.rd_port}" if stack.rd_direct else ""
+        print(f"RustDesk:   ID {rustdesk_id}{direct}" if rustdesk_id else f"RustDesk:   ID mit `./agentbox status`{direct}")
+
+
+def _rustdesk_id(stack: Stack, logs: str) -> str | None:
+    found = [i for i in re.findall(r"RustDesk-ID: (\S+)", logs) if i.isdigit()]
+    if found:
+        return found[-1]
+    # nicht (mehr) im Log, z.B. weil RustDesk beim Start noch nicht bereit war: live fragen
+    out = docker.out("exec", "-u", "dev", "-e", "DISPLAY=:0", stack.name, "rustdesk", "--get-id")
+    digits = "".join(c for c in out if c.isdigit())
+    return digits or None
 
 
 def cmd_status(args) -> int:
     stack = _stack(args)
     docker.compose(_ensure_compose(stack), "ps", check=False)
+    rd_id = None
     if docker.exists(stack.name):
-        logs = docker.out("logs", stack.name)
-        rd = re.findall(r"RustDesk-ID: (\S+)", logs)
-        if rd:
-            print(f"\nRustDesk-ID: {rd[-1]}")
+        logs = docker.logs(stack.name)
+        if stack.rustdesk:
+            rd_id = _rustdesk_id(stack, logs)
+            if not rd_id:
+                print("\nRustDesk-ID: noch keine – Desktop-Log: "
+                      f"docker exec -u dev {stack.name} tail -40 ~/.agentbox-desktop.log")
         warns = [line for line in logs.splitlines() if "WARN" in line][-5:]
         if warns:
             print("\nLetzte Warnungen:")
             print("\n".join(f"  {w}" for w in warns))
-    _hints(stack)
+    _hints(stack, rd_id)
     return 0
 
 

@@ -31,6 +31,16 @@ def out(*args: str) -> str:
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def logs(container: str, tail: int | None = None) -> str:
+    """Container-Log inkl. stderr (die Box schreibt ihre Meldungen dorthin)."""
+    args = ["docker", "logs"] + (["--tail", str(tail)] if tail else []) + [container]
+    try:
+        r = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except FileNotFoundError as e:
+        raise DockerError("docker-CLI nicht gefunden") from e
+    return r.stdout if r.returncode == 0 else ""
+
+
 def exists(container: str) -> bool:
     return run("container", "inspect", container, check=False, quiet=True).returncode == 0
 
