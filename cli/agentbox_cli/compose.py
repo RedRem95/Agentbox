@@ -23,7 +23,7 @@ def _limits(svc: dict, memory: str | None, cpus: float | None) -> None:
 def _quote(doc: dict) -> dict:
     """Listen-Strings (Ports "2222:22", Env, Volumes) immer quoten – YAML-1.1-Parser lesen 2222:22 sonst als Zahl."""
     for svc in doc["services"].values():
-        for key in ("ports", "environment", "volumes", "devices", "extra_hosts"):
+        for key in ("ports", "environment", "volumes", "devices", "extra_hosts", "group_add"):
             if key in svc:
                 svc[key] = [Q(v) if isinstance(v, str) else v for v in svc[key]]
     return doc
@@ -38,6 +38,7 @@ def build(stack: Stack, existing: set[str]) -> tuple[dict, list[str], list[str]]
     volumes = [f"{stack.name}-home", f"{stack.name}-tools", f"{stack.name}-sshd"]
     emu_services: list[str] = []
 
+    kvm_gid = C.get(stack.cfg, "container.kvm_gid", host.kvm_gid)
     for e in stack.emulators:
         if not host.kvm and e.name not in existing:
             notes.append(f"/dev/kvm fehlt – Emulator {e.name} wird ausgelassen")
@@ -50,6 +51,9 @@ def build(stack: Stack, existing: set[str]) -> tuple[dict, list[str], list[str]]
             + [f"{k}={v}" for k, v in e.env.items()],
             "volumes": [f"{e.name}-data:/home/androidusr"],
         }
+        # Der Emulator läuft im Container nicht als root: er braucht die Gruppe, der /dev/kvm auf dem Host gehört
+        if kvm_gid is not None:
+            svc["group_add"] = [str(kvm_gid)]
         if e.vnc_port:
             svc["ports"] = [f"127.0.0.1:{e.vnc_port}:6080"]  # noVNC nur lokal; adb bleibt intern
         _limits(svc, e.memory, e.cpus)

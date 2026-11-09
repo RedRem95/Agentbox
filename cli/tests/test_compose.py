@@ -30,11 +30,11 @@ container:
 """
 
 
-def _build(tmp_path, kvm=True, existing=frozenset()):
+def _build(tmp_path, kvm=True, existing=frozenset(), cfg=CFG, kvm_gid=103):
     (tmp_path / "exists").mkdir()
     p = tmp_path / "agentbox.yaml"
-    p.write_text(CFG)
-    host = C.Host(home=tmp_path, uid=1234, gid=1234, kvm=kvm, sudo_uid=None, sudo_gid=None)
+    p.write_text(cfg)
+    host = C.Host(home=tmp_path, uid=1234, gid=1234, kvm=kvm, sudo_uid=None, sudo_gid=None, kvm_gid=kvm_gid)
     stack = Stack.from_config(p, host)
     return stack, *compose.build(stack, set(existing))
 
@@ -90,3 +90,20 @@ def test_written_file_quotes_ports(tmp_path):
 def test_agent_count_per_project(tmp_path):
     stack, *_ = _build(tmp_path)
     assert stack.agent_count == 3  # a: claude, b: claude+codex
+
+
+def test_emulator_gets_kvm_group_of_the_host(tmp_path):
+    _, doc, _, _ = _build(tmp_path)
+    assert doc["services"]["box-phone"]["group_add"] == ["103"]
+    assert "group_add" not in doc["services"]["agentbox"]
+
+
+def test_kvm_group_from_config_wins(tmp_path):
+    cfg = CFG.replace("  name: box\n", "  name: box\n  kvm_gid: 108\n")
+    _, doc, _, _ = _build(tmp_path, cfg=cfg)
+    assert doc["services"]["box-phone"]["group_add"] == ["108"]
+
+
+def test_no_group_add_when_unknown(tmp_path):
+    _, doc, _, _ = _build(tmp_path, kvm_gid=None)
+    assert "group_add" not in doc["services"]["box-phone"]

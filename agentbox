@@ -52,6 +52,7 @@ args=(run --rm -i
   -v "$PWD:$PWD" -w "$PWD"
   -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e HOST_HOME="$HOME"
   -e HOST_KVM="$([[ -e /dev/kvm ]] && echo 1 || echo 0)"
+  -e HOST_KVM_GID="$(stat -c %g /dev/kvm 2>/dev/null || stat -f %g /dev/kvm 2>/dev/null || true)"
   -e AGENTBOX_IMAGE="$IMAGE"
   -e AGENTBOX_CONFIG
   -e RUSTDESK_PASSWORD

@@ -61,6 +61,7 @@ class Host:
     kvm: bool
     sudo_uid: int | None
     sudo_gid: int | None
+    kvm_gid: int | None = None  # Gruppe von /dev/kvm auf dem Host (Emulatoren brauchen sie)
 
     @classmethod
     def detect(cls) -> Host:
@@ -71,7 +72,11 @@ class Host:
         kvm = env.get("HOST_KVM", "1" if Path("/dev/kvm").exists() else "0") == "1"
         su = env.get("SUDO_UID")
         sg = env.get("SUDO_GID")
-        return cls(home, uid, gid, kvm, int(su) if su else None, int(sg) if sg else None)
+        kg = env.get("HOST_KVM_GID", "")
+        if not kg and Path("/dev/kvm").exists():
+            kg = str(Path("/dev/kvm").stat().st_gid)
+        return cls(home, uid, gid, kvm, int(su) if su else None, int(sg) if sg else None,
+                   int(kg) if kg.isdigit() else None)
 
     def expand(self, p: str) -> str:
         if p == "~" or p.startswith("~/"):

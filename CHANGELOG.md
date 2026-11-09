@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ### Fixed
 
+- Android emulators couldn't use KVM: they run as a non-root user and lacked the group that owns
+  `/dev/kvm` on the host. The emulator containers now get that group (detected on the host,
+  overridable with `container.kvm_gid`).
 - `agentbox status` now shows the RustDesk ID and the box's warnings. It only read stdout of the
   container log, but the box writes its messages to stderr. If the ID isn't in the log, it is
   asked from RustDesk directly.

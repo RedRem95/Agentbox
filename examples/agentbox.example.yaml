@@ -100,6 +100,7 @@ container:
   src: ""                     # leer = Docker-Volume; oder Host-Pfad, z.B. ~/agentbox-src
   env_file: .env              # API-Keys etc.
   network: ""                 # leer = <name>-net
+  # kvm_gid: 103              # Gruppe von /dev/kvm; Standard: wird auf dem Host erkannt (stat -c %g /dev/kvm)
   android_emulators:          # eigene Container (braucht /dev/kvm), automatisch per adb verbunden
     - name: agentbox-emu
       image: budtmo/docker-android:emulator_14.0
