@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-09
+
+Two fixes for things that didn't work in 0.1.0. Get the new wrapper from this release and run
+`./agentbox up`; the emulators are recreated with the right group, their data stays.
+
 ### Fixed
 
 - Android emulators couldn't use KVM: they run as a non-root user and lacked the group that owns
@@ -49,5 +54,6 @@ attach to over SSH, and optionally Android emulators and a desktop for GUI testi
 - The image is published for `linux/amd64` only.
 - The CLI talks German for now.
 
-[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/RedRem95/Agentbox/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/RedRem95/Agentbox/releases/tag/v0.1.0
