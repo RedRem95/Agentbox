@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+### Added
+
+- `android.docker_control: true` lets the agents inspect and restart the emulator containers with
+  `emu status | logs | files | restart | wait` – status shows restarts, OOM kills, exit codes and
+  memory use. Docker access goes through a socket proxy that only allows these containers and
+  these actions (no exec). `agentbox init` asks for it.
+- Claude gets an `agentbox` skill generated from the config (what the box has, what persists, what
+  the agent may and may not do), plus a short pointer to it in `~/.claude/CLAUDE.md`.
+
 ## [0.1.1] - 2026-11-09
 
 Two fixes for things that didn't work in 0.1.0. Get the new wrapper from this release and run

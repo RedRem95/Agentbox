@@ -415,6 +415,17 @@ if ((${#ADB_DEVICES[@]})); then
   fi
 fi
 
+# ---------------------------------------------------------------- Emulator-Kontrolle (android.docker_control)
+# DOCKER_HOST zeigt auf den Socket-Proxy, der nur die Emulator-Container durchlässt (siehe `emu --help`).
+mkdir -p /etc/agentbox
+jq -r '.container.android_emulators // [] | .[] | (if type == "string" then . else .name end) // empty' \
+  "$CFG_JSON" > /etc/agentbox/emulators
+
+if [[ -n "${DOCKER_HOST:-}" ]]; then
+  echo "export DOCKER_HOST=$DOCKER_HOST" >> /etc/agentbox-env.sh
+  log "Emulator-Kontrolle aktiv (emu status | logs | files | restart)"
+fi
+
 # ---------------------------------------------------------------- Desktop + RustDesk (optional)
 # desktop.enabled: true -> Xvfb/Openbox auf DISPLAY=:0; Agenten/Apps aus herdr erscheinen dort.
 toml_str() { local x=${1//\\/\\\\}; x=${x//\"/\\\"}; printf '"%s"' "$x"; }
@@ -494,6 +505,7 @@ if [[ "$(cfg '.desktop.enabled // false')" == true ]]; then
     agentbox-desktop "$(cfg '.desktop.resolution // "1600x900"')" "$RD_ON" >> "$DEV_HOME/.agentbox-desktop.log" 2>&1 &
   # Alles, was später aus herdr gestartet wird, landet auf diesem Desktop
   export DISPLAY=:0
+  AGENTBOX_DESKTOP=1
   echo 'export DISPLAY=:0' >> /etc/agentbox-env.sh
   if ((RD_ON)); then
     for _ in $(seq 1 20); do
@@ -505,6 +517,41 @@ if [[ "$(cfg '.desktop.enabled // false')" == true ]]; then
 fi
 # Passwort nicht an herdr/Agenten vererben
 unset RUSTDESK_PASSWORD
+
+# ---------------------------------------------------------------- Agent-Kontext: agentbox-Skill
+# Claude bekommt einen Skill, der aus dieser Config erzeugt wird (was die Box hat, was erhalten
+# bleibt, was der Agent darf), plus einen kurzen, immer geladenen Hinweis darauf in ~/.claude/CLAUDE.md.
+AB_BEGIN='<!-- agentbox -->'
+AB_END='<!-- /agentbox -->'
+managed_block() {  # <datei> [inhalt] – verwalteten Block ersetzen; ohne Inhalt nur entfernen
+  local f=$1 body=${2:-} rest
+  if [[ -f "$f" ]]; then
+    rest=$(sed "\|^$AB_BEGIN\$|,\|^$AB_END\$|d" "$f")   # $(…) schneidet Leerzeilen am Ende ab
+  else
+    rest=""
+  fi
+  [[ -n "$rest" || -n "$body" || -f "$f" ]] || return 0
+  as_dev mkdir -p "$(dirname "$f")"
+  {
+    [[ -n "$rest" ]] && printf '%s\n' "$rest"
+    [[ -n "$rest" && -n "$body" ]] && echo
+    [[ -n "$body" ]] && printf '%s\n%s\n%s\n' "$AB_BEGIN" "$body" "$AB_END"
+    true
+  } | as_dev tee "$f" >/dev/null
+}
+
+if has_agent claude; then
+  skill_dir="$DEV_HOME/.claude/skills/agentbox"
+  as_dev mkdir -p "$skill_dir"
+  AGENTBOX_DESKTOP=${AGENTBOX_DESKTOP:-0} agentbox-skill "$CFG_JSON" "$(hostname)" | as_dev tee "$skill_dir/SKILL.md" >/dev/null
+  managed_block "$DEV_HOME/.claude/CLAUDE.md" "You are running inside an agentbox container. Before installing system packages or tools, \
+touching Docker or the Android emulators, starting GUI apps, or relying on anything outside the repos and \
+your home surviving a restart, use the \`agentbox\` skill: it describes what this box has, what persists \
+and what you can and can't control."
+  log "agentbox-Skill für Claude geschrieben"
+else
+  managed_block "$DEV_HOME/.claude/CLAUDE.md"
+fi
 
 # ---------------------------------------------------------------- herdr
 

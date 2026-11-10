@@ -67,3 +67,6 @@ jobs:
           docker run --rm --entrypoint agentbox-cli agentbox:ci --version
           docker run --rm --entrypoint herdr agentbox:ci --version
           docker run --rm --entrypoint bash agentbox:ci -c 'yq --version && gh --version && docker compose version && jq --version'
+          docker run --rm --entrypoint emu agentbox:ci --help
+          echo '{"repos":["https://github.com/x/demo.git"]}' \
+            | docker run --rm -i --entrypoint agentbox-skill agentbox:ci /dev/stdin demo | grep -q '^name: agentbox$'

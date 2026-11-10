@@ -107,3 +107,25 @@ def test_kvm_group_from_config_wins(tmp_path):
 def test_no_group_add_when_unknown(tmp_path):
     _, doc, _, _ = _build(tmp_path, kvm_gid=None)
     assert "group_add" not in doc["services"]["box-phone"]
+
+
+def test_docker_control_adds_restricted_proxy(tmp_path):
+    cfg = CFG.replace("container:\n", "android: {docker_control: true}\ncontainer:\n")
+    stack, doc, side, _ = _build(tmp_path, cfg=cfg)
+    proxy = doc["services"]["box-dockerproxy"]
+    assert side == ["box-phone", "box-dockerproxy"]  # wird vor der Box gestartet
+    assert any("containers/(box\\-phone)/" in c for c in proxy["command"])
+    box = doc["services"]["agentbox"]
+    assert "DOCKER_HOST=tcp://box-dockerproxy:2375" in box["environment"]
+    assert box["networks"] == ["stack", "ctl"] and proxy["networks"] == ["ctl"]
+    assert doc["networks"]["ctl"] == {"name": "box-ctl"}
+    assert "ctl" not in doc["services"]["box-phone"]["networks"]  # Emulator sieht den Proxy nicht
+
+
+def test_no_proxy_without_flag_or_emulators(tmp_path):
+    _, doc, side, _ = _build(tmp_path)
+    assert "box-dockerproxy" not in doc["services"] and side == ["box-phone"]
+    cfg = CFG.replace("container:\n", "android: {docker_control: true}\ncontainer:\n")
+    (tmp_path / "x").mkdir()
+    _, doc, side, _ = _build(tmp_path / "x", cfg=cfg, kvm=False)  # Emulator ausgelassen -> kein Proxy
+    assert "box-dockerproxy" not in doc["services"] and side == []

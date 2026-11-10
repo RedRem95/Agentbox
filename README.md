@@ -121,8 +121,22 @@ and need `/dev/kvm`, which means a Linux x86_64 host. The box keeps an `adb` con
 [mobile-mcp](https://github.com/mobile-next/mobile-mcp) server to look at and tap through the app.
 You can watch each emulator in your browser via noVNC (bound to `localhost` only).
 
+When emulators keep crashing, you want the agent to look into it. With
+`android.docker_control: true` the box gets `emu`: `emu status` (restarts, OOM kills, exit code,
+memory), `emu logs`, `emu files` (copies the emulator's log files out) and `emu restart`. It goes
+through a small socket proxy ([wollomatic/socket-proxy](https://github.com/wollomatic/socket-proxy))
+that only lets through these containers and these actions – no `exec`, no other containers.
+
 On a Mac there's no KVM inside Docker. Run the emulator natively and point the box at it with
 `android.devices: ["host.docker.internal:5555"]`.
+
+## What the agents know
+
+Claude gets an `agentbox` skill, generated from your config on every start: which repos and
+toolchains are there, what survives a rebuild and what doesn't, that the config is read-only and
+changes go through you, how to reach the emulators, the real memory limit, and whether it may use
+`emu`. A three-line note in `~/.claude/CLAUDE.md` points to it; your own content in that file is
+left alone.
 
 ## Desktop and RustDesk
 

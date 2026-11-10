@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -23,7 +24,7 @@ def _limits(svc: dict, memory: str | None, cpus: float | None) -> None:
 def _quote(doc: dict) -> dict:
     """Listen-Strings (Ports "2222:22", Env, Volumes) immer quoten – YAML-1.1-Parser lesen 2222:22 sonst als Zahl."""
     for svc in doc["services"].values():
-        for key in ("ports", "environment", "volumes", "devices", "extra_hosts", "group_add"):
+        for key in ("ports", "environment", "volumes", "devices", "extra_hosts", "group_add", "command"):
             if key in svc:
                 svc[key] = [Q(v) if isinstance(v, str) else v for v in svc[key]]
     return doc
@@ -110,14 +111,55 @@ def build(stack: Stack, existing: set[str]) -> tuple[dict, list[str], list[str]]
         box["env_file"] = [{"path": str(stack.env_file_or_default), "required": False}]
     _limits(box, stack.box_memory, stack.box_cpus)
     services["agentbox"] = box
+    networks = {"stack": {"name": stack.network}}
+
+    # android.docker_control: Agenten dürfen die Emulator-Container ansehen und neu starten –
+    # über einen Socket-Proxy, der nur diese Container-Namen und nur diese Aktionen durchlässt.
+    side = list(emu_services)
+    if emu_services and C.get(stack.cfg, "android.docker_control", False) is True:
+        proxy = f"{stack.name}-dockerproxy"
+        services[proxy] = docker_proxy(stack.name, emu_services, host)
+        networks["ctl"] = {"name": f"{stack.name}-ctl"}
+        box["networks"].append("ctl")
+        box["environment"].append(f"DOCKER_HOST=tcp://{proxy}:2375")
+        side.append(proxy)
 
     doc = {
         "name": stack.name,
         "services": services,
-        "networks": {"stack": {"name": stack.network}},
+        "networks": networks,
         "volumes": {v: {"name": v} for v in volumes},
     }
-    return doc, emu_services, notes
+    return doc, side, notes
+
+
+def docker_proxy(box_name: str, emulators: list[str], host: C.Host) -> dict:
+    """wollomatic/socket-proxy mit Allowlist: nur die Emulatoren, nur lesen + start/stop/restart/kill.
+    Bewusst ohne exec (ließe sich "privileged" anfordern – der Proxy sieht nur Pfade, keine Inhalte)."""
+    names = "|".join(re.escape(n) for n in emulators)
+    v = r"(/v1\.[0-9]+)?"
+    svc: dict = {
+        "image": "wollomatic/socket-proxy:1",
+        "container_name": f"{box_name}-dockerproxy",
+        "hostname": f"{box_name}-dockerproxy",
+        "restart": "unless-stopped",
+        "command": [
+            f"-allowfrom={box_name}",
+            "-listenip=0.0.0.0",
+            f"-allowHEAD=^{v}/(_ping|containers/({names})/archive)$",
+            f"-allowGET=^{v}/(_ping|version|containers/({names})/(json|logs|stats|top|archive))$",
+            f"-allowPOST=^{v}/containers/({names})/(start|stop|restart|kill)$",
+        ],
+        "volumes": [f"{host.docker_sock}:/var/run/docker.sock:ro"],
+        "networks": ["ctl"],
+        "read_only": True,
+        "cap_drop": ["ALL"],
+        "security_opt": ["no-new-privileges:true"],
+        "mem_limit": "64m",
+    }
+    if host.docker_gid is not None:
+        svc["user"] = f"65534:{host.docker_gid}"  # nobody + Docker-Gruppe statt root
+    return svc
 
 
 def write(stack: Stack, doc: dict) -> Path:

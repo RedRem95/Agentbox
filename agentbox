@@ -53,6 +53,8 @@ args=(run --rm -i
   -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e HOST_HOME="$HOME"
   -e HOST_KVM="$([[ -e /dev/kvm ]] && echo 1 || echo 0)"
   -e HOST_KVM_GID="$(stat -c %g /dev/kvm 2>/dev/null || stat -f %g /dev/kvm 2>/dev/null || true)"
+  -e HOST_DOCKER_SOCK="$SOCK"
+  -e HOST_DOCKER_GID="$(stat -L -c %g "$SOCK" 2>/dev/null || stat -L -f %g "$SOCK" 2>/dev/null || true)"
   -e AGENTBOX_IMAGE="$IMAGE"
   -e AGENTBOX_CONFIG
   -e RUSTDESK_PASSWORD

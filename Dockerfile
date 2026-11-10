@@ -93,7 +93,10 @@ RUN printf '%s\n' \
 COPY image/entrypoint.sh /usr/local/bin/agentbox-entrypoint
 COPY image/adb-watch.sh /usr/local/bin/adb-watch
 COPY image/desktop.sh /usr/local/bin/agentbox-desktop
-RUN chmod +x /usr/local/bin/agentbox-entrypoint /usr/local/bin/adb-watch /usr/local/bin/agentbox-desktop
+COPY image/emu.sh /usr/local/bin/emu
+COPY image/agent-skill.sh /usr/local/bin/agentbox-skill
+RUN chmod +x /usr/local/bin/agentbox-entrypoint /usr/local/bin/adb-watch /usr/local/bin/agentbox-desktop \
+             /usr/local/bin/emu /usr/local/bin/agentbox-skill
 
 # agentbox-Tool (Python) – wird über den Wrapper ./agentbox auf dem Host gestartet
 COPY cli/pyproject.toml /opt/agentbox-cli/src/pyproject.toml

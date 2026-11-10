@@ -81,6 +81,9 @@ android:
   # cmdline_tools_version: "13114758"
   devices: []                 # zusätzliche adb-Ziele, z.B. ["host.docker.internal:5555"] für nativen Emulator auf dem Host
   mcp: true                   # mobile-mcp bei allen Agenten registrieren
+  # Agenten dürfen die Emulator-Container ansehen und neu starten (`emu status|logs|files|restart`).
+  # Läuft über einen Socket-Proxy, der nur diese Container und nur diese Aktionen durchlässt (kein exec).
+  docker_control: true
 
 # Weitere MCP-Server für alle Agenten (claude, codex, opencode, gemini)
 mcp_servers: {}

@@ -163,6 +163,7 @@ def run(cfg_path: Path, host: C.Host, res: HostRes | None) -> bool:
 
     # ---- Android
     emulators: list[tuple[str, str]] = []
+    docker_control = False
     if total.android or yes("Android-Emulatoren einrichten?", False):
         header("Android-Emulatoren")
         print("Emulatoren laufen in eigenen Containern (brauchen /dev/kvm) und hängen per adb an der Box.")
@@ -173,6 +174,9 @@ def run(cfg_path: Path, host: C.Host, res: HostRes | None) -> bool:
         for key in (["phone", "tablet"] if sel == "both" else [] if sel == "none" else [sel]):
             dev = ask(f"  Gerät für {EMU_PRESETS[key][1]}", EMU_PRESETS[key][0])
             emulators.append((key, dev))
+        if emulators:
+            docker_control = yes("Dürfen die Agenten die Emulator-Container ansehen und neu starten? "
+                                 "(Logs, Status, Restart – nur diese Container, kein exec)", True)
 
     # ---- Desktop / RustDesk
     header("Desktop (GUI-Tests per RustDesk)")
@@ -283,7 +287,7 @@ def run(cfg_path: Path, host: C.Host, res: HostRes | None) -> bool:
     if total.android or emulators:
         cfg["android"] = M(jdk=total.jdk or 21,
                            sdk_packages=sorted(total.sdk_packages or {"platform-tools"}),
-                           mcp=True)
+                           mcp=True, docker_control=docker_control)
     if desktop:
         cfg["desktop"] = M(enabled=True, resolution="1600x900", rustdesk=rd)
     cfg["user"] = M(sudo=True)

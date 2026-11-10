@@ -104,21 +104,21 @@ def cmd_up(args) -> int:
         docker.run("pull", stack.image)
     _ensure_rustdesk_password(stack)
 
-    doc, emu_services, notes = compose.build(stack, existing)
+    doc, side_services, notes = compose.build(stack, existing)
     for n in notes:
         print(f"Hinweis: {n}")
     path = compose.write(stack, doc)
     print(f"Compose-Datei: {path}")
 
     # Container aus früheren run.sh/docker-run-Starts übernehmen (gleiche Namen/Volumes)
-    for c in [stack.name, *emu_services]:
+    for c in [stack.name, *side_services]:
         if docker.exists(c) and not docker.compose_project(c):
             print(f"Ersetze alten Container {c} durch Compose-Version (Volumes bleiben)")
             docker.run("rm", "-f", c, quiet=True)
 
-    # Emulatoren nur bei geänderter Definition neu, Box immer neu (Entrypoint liest Config neu)
-    if emu_services:
-        docker.compose(path, "up", "-d", "--remove-orphans", *emu_services)
+    # Emulatoren/Proxy nur bei geänderter Definition neu, Box immer neu (Entrypoint liest Config neu)
+    if side_services:
+        docker.compose(path, "up", "-d", "--remove-orphans", *side_services)
     docker.compose(path, "up", "-d", "--remove-orphans", "--no-deps", "--force-recreate", "agentbox")
     _hints(stack)
     return 0

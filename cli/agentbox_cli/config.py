@@ -62,6 +62,8 @@ class Host:
     sudo_uid: int | None
     sudo_gid: int | None
     kvm_gid: int | None = None  # Gruppe von /dev/kvm auf dem Host (Emulatoren brauchen sie)
+    docker_sock: str = "/var/run/docker.sock"
+    docker_gid: int | None = None  # Gruppe des Docker-Sockets (für den Socket-Proxy ohne root)
 
     @classmethod
     def detect(cls) -> Host:
@@ -75,8 +77,12 @@ class Host:
         kg = env.get("HOST_KVM_GID", "")
         if not kg and Path("/dev/kvm").exists():
             kg = str(Path("/dev/kvm").stat().st_gid)
+        sock = env.get("HOST_DOCKER_SOCK", "/var/run/docker.sock")
+        dg = env.get("HOST_DOCKER_GID", "")
+        if not dg and Path(sock).exists():
+            dg = str(Path(sock).stat().st_gid)
         return cls(home, uid, gid, kvm, int(su) if su else None, int(sg) if sg else None,
-                   int(kg) if kg.isdigit() else None)
+                   int(kg) if kg.isdigit() else None, sock, int(dg) if dg.isdigit() else None)
 
     def expand(self, p: str) -> str:
         if p == "~" or p.startswith("~/"):

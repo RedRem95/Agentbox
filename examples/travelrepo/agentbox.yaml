@@ -72,6 +72,9 @@ android:
     - ndk;28.2.13676358
     - cmake;3.31.6
   mcp: true
+  # Agenten dürfen die Emulator-Container ansehen und neu starten (`emu status|logs|files|restart`).
+  # Läuft über einen Socket-Proxy, der nur diese Container und nur diese Aktionen durchlässt (kein exec).
+  docker_control: true
 
 # Optionaler Desktop (Xvfb + Openbox) mit RustDesk – z.B. um GUI-Apps selbst zu testen.
 # Apps, die aus herdr gestartet werden, erscheinen dort (DISPLAY=:0).
