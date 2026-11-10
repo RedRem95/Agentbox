@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-11
+
+Faster emulators: they now use all the cores their container is allowed to.
+
 ### Changed
 
 - Emulators now use as many CPU cores as their container may use. The docker-android AVD is set
@@ -89,7 +93,8 @@ attach to over SSH, and optionally Android emulators and a desktop for GUI testi
 - The image is published for `linux/amd64` only.
 - The CLI talks German for now.
 
-[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/RedRem95/Agentbox/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/RedRem95/Agentbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/RedRem95/Agentbox/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/RedRem95/Agentbox/compare/v0.1.0...v0.1.1
