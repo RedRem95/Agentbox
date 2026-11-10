@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+### Changed
+
+- Emulators now use as many CPU cores as their container may use. The docker-android AVD is set
+  to `hw.cpu.ncore=1`, so a container with 3 CPUs still emulated a single core. agentbox passes
+  `-cores` (the container's `cpus`, rounded up) to the emulator; set `cores: N` per emulator to
+  choose yourself, or `cores: 0` to keep the AVD's value. Emulators are recreated on the next
+  `agentbox up`, their data stays.
+
 ## [0.2.1] - 2026-11-11
 
 ### Fixed

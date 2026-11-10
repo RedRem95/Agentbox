@@ -111,5 +111,7 @@ container:
       vnc_port: 6080          # Bildschirm unter http://localhost:6080 (nur lokal gebunden)
       memory: 4g              # mind. 3g, besser 4g
       cpus: 2
+      # cores: auto            # vCPUs im Android-Gast; auto = cpus aufgerundet (AVD-Standard ist 1 Kern),
+      #                         # 0 = AVD-Wert lassen. Alternativ env: {EMULATOR_ADDITIONAL_ARGS: "-cores 4"}
   mounts:                     # host:container[:ro] – fehlende Host-Pfade werden übersprungen
     - ~/.gitconfig:/home/dev/.gitconfig.host:ro

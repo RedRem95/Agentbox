@@ -119,7 +119,9 @@ Emulators run in their own containers ([docker-android](https://github.com/budtm
 and need `/dev/kvm`, which means a Linux x86_64 host. The box keeps an `adb` connection to them, so
 `adb devices` just works in every herdr pane, and the agents get the
 [mobile-mcp](https://github.com/mobile-next/mobile-mcp) server to look at and tap through the app.
-You can watch each emulator in your browser via noVNC (bound to `localhost` only).
+You can watch each emulator in your browser via noVNC (bound to `localhost` only). Each emulator
+gets as many virtual cores as its container's `cpus` limit allows (rounded up); override with
+`cores: N`.
 
 When emulators keep crashing, you want the agent to look into it. With
 `android.docker_control: true` the box gets `emu`: `emu status` (restarts, OOM kills, exit code,

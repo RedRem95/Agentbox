@@ -1,5 +1,6 @@
 import io
 
+import pytest
 from ruamel.yaml import YAML
 
 from agentbox_cli import compose
@@ -129,3 +130,26 @@ def test_no_proxy_without_flag_or_emulators(tmp_path):
     (tmp_path / "x").mkdir()
     _, doc, side, _ = _build(tmp_path / "x", cfg=cfg, kvm=False)  # Emulator ausgelassen -> kein Proxy
     assert "box-dockerproxy" not in doc["services"] and side == []
+
+
+@pytest.mark.parametrize("emu,expected", [
+    ({"cpus": 3}, "-cores 3"),
+    ({"cpus": 1.5}, "-cores 2"),                  # aufrunden: 2 vCPUs teilen sich 1.5 CPUs Quota
+    ({"cpus": 0.5}, "-cores 1"),
+    ({}, None),                                    # kein Limit -> nicht anfassen
+    ({"cpus": 3, "cores": 4}, "-cores 4"),         # explizit
+    ({"cpus": 3, "cores": "auto"}, "-cores 3"),
+    ({"cpus": 3, "cores": 0}, None),               # 0 = AVD-Wert lassen
+    ({"cpus": 3, "env": {"EMULATOR_ADDITIONAL_ARGS": "-memory 3072"}}, "-memory 3072 -cores 3"),
+    ({"cpus": 3, "env": {"EMULATOR_ADDITIONAL_ARGS": "-cores 2 -gpu off"}}, "-cores 2 -gpu off"),
+])
+def test_emulator_cores(emu, expected):
+    from agentbox_cli.stack import Emulator
+    e = Emulator(name="x", cpus=emu.get("cpus"), env=emu.get("env", {}),
+                 cores=None if emu.get("cores") in (None, "auto") else int(emu["cores"]))
+    assert compose.emulator_env(e).get("EMULATOR_ADDITIONAL_ARGS") == expected
+
+
+def test_cores_in_generated_service(tmp_path):
+    _, doc, _, _ = _build(tmp_path)  # box-phone hat cpus: 2
+    assert "EMULATOR_ADDITIONAL_ARGS=-cores 2" in doc["services"]["box-phone"]["environment"]

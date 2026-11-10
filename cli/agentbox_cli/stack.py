@@ -20,6 +20,7 @@ class Emulator:
     vnc_port: int | None = None
     memory: str | None = None
     cpus: float | None = None
+    cores: int | None = None  # vCPUs im Android-Gast; None = aus cpus ableiten, 0 = nicht anfassen
     env: dict = field(default_factory=dict)
 
 
@@ -83,6 +84,7 @@ class Stack:
                 vnc_port=int(e["vnc_port"]) if e.get("vnc_port") else None,
                 memory=str(e["memory"]) if e.get("memory") else None,
                 cpus=float(e["cpus"]) if e.get("cpus") else None,
+                cores=int(e["cores"]) if e.get("cores") is not None and str(e["cores"]) != "auto" else None,
                 env={str(k): str(v) for k, v in (e.get("env") or {}).items()},
             ))
 

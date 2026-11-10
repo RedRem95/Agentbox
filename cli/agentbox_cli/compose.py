@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import math
 import os
 import re
 from pathlib import Path
@@ -10,7 +11,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString as Q
 
 from . import config as C
-from .stack import Stack
+from .stack import Emulator, Stack
 
 
 def _limits(svc: dict, memory: str | None, cpus: float | None) -> None:
@@ -28,6 +29,25 @@ def _quote(doc: dict) -> dict:
             if key in svc:
                 svc[key] = [Q(v) if isinstance(v, str) else v for v in svc[key]]
     return doc
+
+
+def emulator_cores(e: Emulator) -> int | None:
+    """vCPUs für den Android-Gast. Ohne Angabe: CPU-Limit des Containers, aufgerundet
+    (die AVD steht sonst auf hw.cpu.ncore=1 und nutzt nur einen Kern)."""
+    if e.cores is not None:
+        return e.cores or None
+    return max(1, math.ceil(e.cpus)) if e.cpus else None
+
+
+def emulator_env(e: Emulator) -> dict:
+    """Eigene env-Einträge plus -cores in EMULATOR_ADDITIONAL_ARGS (gilt bei jedem Start,
+    vor hw.cpu.ncore aus der AVD). Steht dort schon ein -cores, bleibt es unangetastet."""
+    env = dict(e.env)
+    cores = emulator_cores(e)
+    args = env.get("EMULATOR_ADDITIONAL_ARGS", "")
+    if cores and not re.search(r"(^|\s)-cores(\s|$)", args):
+        env["EMULATOR_ADDITIONAL_ARGS"] = f"{args} -cores {cores}".strip()
+    return env
 
 
 def build(stack: Stack, existing: set[str]) -> tuple[dict, list[str], list[str]]:
@@ -49,7 +69,7 @@ def build(stack: Stack, existing: set[str]) -> tuple[dict, list[str], list[str]]
             "restart": "unless-stopped", "devices": ["/dev/kvm"], "networks": ["stack"],
             "environment": [f"EMULATOR_DEVICE={e.device}"]
             + (["WEB_VNC=true"] if e.vnc_port else [])
-            + [f"{k}={v}" for k, v in e.env.items()],
+            + [f"{k}={v}" for k, v in emulator_env(e).items()],
             "volumes": [f"{e.name}-data:/home/androidusr"],
         }
         # Der Emulator läuft im Container nicht als root: er braucht die Gruppe, der /dev/kvm auf dem Host gehört
