@@ -4,7 +4,7 @@
 # only reading, copying files out and start/stop/restart. No exec.
 set -euo pipefail
 
-LIST=/etc/agentbox/emulators
+LIST=${EMU_LIST:-/etc/agentbox/emulators}
 OUT=${EMU_OUT:-/tmp/emu}
 
 usage() {
@@ -66,13 +66,42 @@ cmd_status() {
   done
 }
 
+# Docker log stream -> plain text. Without a TTY the API prefixes every chunk with an 8-byte
+# header (stream type + length); with a TTY it's raw. Reads incrementally, so -f works too.
+demux() {
+  python3 -c '
+import sys
+r, w = sys.stdin.buffer, sys.stdout.buffer
+head = r.read(8)
+if head and (head[0] not in (0, 1, 2) or head[1:4] != bytes(3)):
+    w.write(head)
+    while chunk := r.read1(65536):
+        w.write(chunk)
+        w.flush()
+    sys.exit(0)
+while len(head) == 8:
+    n = int.from_bytes(head[4:8], "big")
+    data = r.read(n)
+    w.write(data)
+    w.flush()
+    head = r.read(8)
+'
+}
+
 cmd_logs() {
-  local e lines=300 follow=()
+  local e lines=300 follow=0 query
   e=$(resolve "${1:?emulator missing}"); shift
   for a in "$@"; do
-    if [[ "$a" == -f ]]; then follow=(-f); elif [[ "$a" =~ ^[0-9]+$ ]]; then lines=$a; fi
+    if [[ "$a" == -f ]]; then follow=1; elif [[ "$a" =~ ^[0-9]+$ ]]; then lines=$a; fi
   done
-  docker logs --timestamps --tail "$lines" "${follow[@]}" "$e" 2>&1
+  # Straight to the API by name: `docker logs` resolves the name to the container ID first,
+  # and the proxy only allows these containers by name.
+  query="stdout=1&stderr=1&timestamps=1&tail=$lines"
+  if ((follow)); then
+    curl -fsSN "http://${DOCKER_HOST#tcp://}/containers/$e/logs?$query&follow=1" | demux
+  else
+    api "/containers/$e/logs?$query" | demux
+  fi
 }
 
 cmd_files() {

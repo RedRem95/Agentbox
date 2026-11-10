@@ -120,7 +120,8 @@ EOF
 ### Inspecting and restarting the emulator containers
 
 You have limited Docker access to the emulator containers only (no exec, no other containers),
-wrapped in `emu`:
+wrapped in `emu`. Use `emu` rather than plain `docker` commands: the proxy only accepts container
+names, and some docker commands (e.g. `docker logs`) switch to the container ID and get rejected.
 
 - `emu status` – running?, restart count, OOM-killed?, exit code, memory use vs. limit, adb state
 - `emu logs <phone|tablet> [lines] [-f]` – container log with timestamps

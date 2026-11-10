@@ -138,6 +138,7 @@ def docker_proxy(box_name: str, emulators: list[str], host: C.Host) -> dict:
     Bewusst ohne exec (ließe sich "privileged" anfordern – der Proxy sieht nur Pfade, keine Inhalte)."""
     names = "|".join(re.escape(n) for n in emulators)
     v = r"(/v1\.[0-9]+)?"
+    q = r"(\?[^/]*)?"  # optional query (?tail=…, ?t=10) – no "/" so it can't smuggle in a second path
     svc: dict = {
         "image": "wollomatic/socket-proxy:1",
         "container_name": f"{box_name}-dockerproxy",
@@ -146,9 +147,9 @@ def docker_proxy(box_name: str, emulators: list[str], host: C.Host) -> dict:
         "command": [
             f"-allowfrom={box_name}",
             "-listenip=0.0.0.0",
-            f"-allowHEAD=^{v}/(_ping|containers/({names})/archive)$",
-            f"-allowGET=^{v}/(_ping|version|containers/({names})/(json|logs|stats|top|archive))$",
-            f"-allowPOST=^{v}/containers/({names})/(start|stop|restart|kill)$",
+            f"-allowHEAD=^{v}/(_ping|containers/({names})/archive){q}$",
+            f"-allowGET=^{v}/(_ping|version|containers/({names})/(json|logs|stats|top|archive)){q}$",
+            f"-allowPOST=^{v}/containers/({names})/(start|stop|restart|kill){q}$",
         ],
         "volumes": [f"{host.docker_sock}:/var/run/docker.sock:ro"],
         "networks": ["ctl"],

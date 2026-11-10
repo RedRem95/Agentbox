@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-11
+
+### Fixed
+
+- `emu logs` was rejected by the Docker proxy: `docker logs` looks up the container ID and
+  asks for the logs by ID, but the proxy only allows the emulators by name. `emu logs` now talks
+  to the Docker API by name and turns the log stream into plain text itself (also with `-f`).
+- The proxy rules also accept a query string (`?tail=…`, `?t=10`), whichever way the proxy
+  matches requests.
+- The agentbox skill tells agents to use `emu` instead of plain `docker` commands.
+
 ## [0.2.0] - 2026-11-11
 
 Agents can now debug the Android emulators themselves, and Claude knows what kind of box it runs in.
@@ -70,7 +81,8 @@ attach to over SSH, and optionally Android emulators and a desktop for GUI testi
 - The image is published for `linux/amd64` only.
 - The CLI talks German for now.
 
-[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/RedRem95/Agentbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/RedRem95/Agentbox/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/RedRem95/Agentbox/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/RedRem95/Agentbox/releases/tag/v0.1.0

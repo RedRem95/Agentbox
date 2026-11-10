@@ -19,9 +19,14 @@ def _rules():
     return rules
 
 
-def _allowed(method, path):
+def _allowed(method, uri):
+    """Must hold whether the proxy matches the bare path or the path including the query."""
     r = _rules().get(method)
-    return bool(r and r.match(path.split("?")[0]))
+    if not r:
+        return False
+    path_only, full = bool(r.match(uri.split("?")[0])), bool(r.match(uri))
+    assert path_only == full or "?" not in uri, f"path/query disagree for {uri}"
+    return full
 
 
 @pytest.mark.parametrize("method,path", [
@@ -32,8 +37,9 @@ def _allowed(method, path):
     ("GET", "/v1.47/containers/travelbox-phone/logs?stdout=1&tail=200"),   # docker logs
     ("GET", "/v1.47/containers/travelbox-tablet/stats?stream=false"),
     ("GET", "/v1.47/containers/travelbox-tablet/top"),
-    ("HEAD", "/v1.47/containers/travelbox-phone/archive?path=/var/log"),   # docker cp …
-    ("GET", "/v1.47/containers/travelbox-phone/archive?path=/var/log"),
+    ("HEAD", "/v1.47/containers/travelbox-phone/archive?path=%2Fvar%2Flog"),  # docker cp (Go encodes /)
+    ("GET", "/v1.47/containers/travelbox-phone/archive?path=%2Fvar%2Flog"),
+    ("GET", "/containers/travelbox-phone/logs?stdout=1&stderr=1&timestamps=1&tail=300"),  # emu logs
     ("POST", "/v1.47/containers/travelbox-phone/restart?t=10"),
     ("POST", "/v1.47/containers/travelbox-tablet/stop"),
     ("POST", "/v1.47/containers/travelbox-tablet/start"),
@@ -53,6 +59,7 @@ def test_allowed(method, path):
     ("GET", "/v1.47/containers/json"),                             # Liste aller Container
     ("GET", "/v1.47/containers/travelbox-phone-x/json"),           # Präfix-Trick
     ("GET", "/v1.47/containers/travelbox-phone/json/../../other/json"),
+    ("GET", "/v1.47/containers/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/logs?tail=10"),
     ("PUT", "/v1.47/containers/travelbox-phone/archive"),          # Dateien hineinschreiben
     ("DELETE", "/v1.47/containers/travelbox-phone"),
     ("POST", "/v1.47/containers/travelbox-phone/update"),
