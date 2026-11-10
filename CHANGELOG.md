@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
+Agents can now debug the Android emulators themselves, and Claude knows what kind of box it runs in.
+
+To use the emulator control, add `docker_control: true` under `android:` in your config, get the
+new wrapper from this release and run `./agentbox up`. The skill needs no setup.
+
 ### Added
 
 - `android.docker_control: true` lets the agents inspect and restart the emulator containers with
@@ -63,6 +70,7 @@ attach to over SSH, and optionally Android emulators and a desktop for GUI testi
 - The image is published for `linux/amd64` only.
 - The CLI talks German for now.
 
-[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RedRem95/Agentbox/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/RedRem95/Agentbox/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/RedRem95/Agentbox/releases/tag/v0.1.0
