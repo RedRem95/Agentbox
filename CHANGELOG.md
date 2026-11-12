@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), ver
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-12
+
+### Fixed
+
+- Emulator containers couldn't be restarted: docker-android deletes the root entry from
+  `/etc/passwd` on every start, so the next start of the same container failed at `sudo`. That
+  broke `docker restart`, stop/start and Docker's own restart after a crash. agentbox now starts
+  docker-android through a short prelude that restores the entry and then hands over to the normal
+  start script as `androidusr` (with the host's KVM group). Set `restart_fix: false` on an
+  emulator to turn it off.
+
 ## [0.3.0] - 2026-11-11
 
 Faster emulators: they now use all the cores their container is allowed to.
@@ -93,7 +104,8 @@ attach to over SSH, and optionally Android emulators and a desktop for GUI testi
 - The image is published for `linux/amd64` only.
 - The CLI talks German for now.
 
-[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/RedRem95/Agentbox/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/RedRem95/Agentbox/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/RedRem95/Agentbox/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/RedRem95/Agentbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/RedRem95/Agentbox/compare/v0.1.1...v0.2.0
