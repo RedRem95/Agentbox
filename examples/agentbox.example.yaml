@@ -113,5 +113,7 @@ container:
       cpus: 2
       # cores: auto            # vCPUs im Android-Gast; auto = cpus aufgerundet (AVD-Standard ist 1 Kern),
       #                         # 0 = AVD-Wert lassen. Alternativ env: {EMULATOR_ADDITIONAL_ARGS: "-cores 4"}
+      # restart_fix: true       # docker-android neustartfähig machen (löscht sonst root aus /etc/passwd
+      #                         # und kann danach nicht mehr starten); nur bei budtmo/docker-android
   mounts:                     # host:container[:ro] – fehlende Host-Pfade werden übersprungen
     - ~/.gitconfig:/home/dev/.gitconfig.host:ro

@@ -153,3 +153,56 @@ def test_emulator_cores(emu, expected):
 def test_cores_in_generated_service(tmp_path):
     _, doc, _, _ = _build(tmp_path)  # box-phone hat cpus: 2
     assert "EMULATOR_ADDITIONAL_ARGS=-cores 2" in doc["services"]["box-phone"]["environment"]
+
+
+def test_docker_android_gets_restartable_start(tmp_path):
+    from agentbox_cli.compose import budtmo_start
+    _, doc, _, _ = _build(tmp_path)
+    emu = doc["services"]["box-phone"]
+    assert emu["user"] == "0:0"
+    assert emu["entrypoint"] == ["/bin/sh", "-c", budtmo_start(103)]
+    assert "--groups=$$G,103" in emu["entrypoint"][2]   # $$ = $ für Compose
+
+
+def test_restart_fix_only_for_docker_android_and_can_be_disabled(tmp_path):
+    cfg = CFG.replace("{name: box-phone,", "{name: box-phone, image: example/other:1,")
+    _, doc, _, _ = _build(tmp_path, cfg=cfg)
+    assert "entrypoint" not in doc["services"]["box-phone"]
+    (tmp_path / "off").mkdir()
+    cfg = CFG.replace("{name: box-phone,", "{name: box-phone, restart_fix: false,")
+    _, doc, _, _ = _build(tmp_path / "off", cfg=cfg)
+    assert "entrypoint" not in doc["services"]["box-phone"] and "user" not in doc["services"]["box-phone"]
+
+
+def test_budtmo_start_survives_repeated_starts(tmp_path):
+    """Simulated: our prelude, then docker-android deletes line 1 of /etc/passwd – three times."""
+    import subprocess
+
+    from agentbox_cli.compose import budtmo_start
+    passwd = tmp_path / "passwd"
+    passwd.write_text("root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1::/:/bin/false\n"
+                      "androidusr:x:1300:1301::/home/androidusr:/bin/bash\n")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "setpriv").write_text(f'#!/bin/sh\necho "$*" > {tmp_path}/setpriv\n')
+    (bin_dir / "id").write_text('#!/bin/sh\ncase "$1" in -u) echo 1300;; -g) echo 1301;; -G) echo "1301 27";; esac\n')
+    for f in bin_dir.iterdir():
+        f.chmod(0o755)
+    script = budtmo_start(103).replace("$$", "$").replace("/etc/passwd", str(passwd))
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "APP_PATH": "/app"}
+    for _ in range(3):
+        subprocess.run(["sh", "-c", script], env=env, check=True)
+        lines = passwd.read_text().splitlines()
+        assert lines[0].startswith("root:")
+        passwd.write_text("\n".join(lines[1:]) + "\n")  # what docker-android does on every start
+        assert [line.split(":")[0] for line in passwd.read_text().splitlines()] == ["daemon", "androidusr"]
+    assert (tmp_path / "setpriv").read_text().split()[:3] == ["--reuid=1300", "--regid=1301", "--groups=1301,27,103"]
+
+
+def test_written_file_quotes_user(tmp_path):
+    cfg = CFG.replace("container:\n", "android: {docker_control: true}\ncontainer:\n")
+    stack, doc, _, _ = _build(tmp_path, cfg=cfg)
+    text = compose.write(stack, doc).read_text()
+    assert 'user: "0:0"' in text
+    reread = YAML(typ="safe", pure=True).load(io.StringIO(text))
+    assert reread["services"]["box-phone"]["user"] == "0:0"

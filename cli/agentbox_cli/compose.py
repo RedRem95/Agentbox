@@ -25,10 +25,34 @@ def _limits(svc: dict, memory: str | None, cpus: float | None) -> None:
 def _quote(doc: dict) -> dict:
     """Listen-Strings (Ports "2222:22", Env, Volumes) immer quoten – YAML-1.1-Parser lesen 2222:22 sonst als Zahl."""
     for svc in doc["services"].values():
+        if isinstance(svc.get("user"), str):
+            svc["user"] = Q(svc["user"])  # "0:0" / "65534:998" – sonst Zahlen in YAML 1.1
         for key in ("ports", "environment", "volumes", "devices", "extra_hosts", "group_add", "command"):
             if key in svc:
                 svc[key] = [Q(v) if isinstance(v, str) else v for v in svc[key]]
     return doc
+
+
+# docker-android löscht bei jedem Start mit `sudo sed -i '1d' /etc/passwd` den root-Eintrag
+# (cli/src/device/emulator.py, change_permission). Beim nächsten Start desselben Containers
+# scheitert dann `sudo` – docker restart, stop/start und Dockers eigener Neustart nach einem
+# Absturz brechen ab. Dieser Vorspann läuft als root, stellt die Zeile wieder her und startet das
+# normale Startscript ohne root-Rechte als androidusr. ($$ = $ für Compose)
+def budtmo_start(kvm_gid: int | None) -> str:
+    """Vorspann für docker-android. Gruppen: die von androidusr plus die KVM-Gruppe des Hosts
+    (group_add allein reicht nicht, setpriv setzt die Gruppen neu)."""
+    extra = f",{kvm_gid}" if kvm_gid is not None else ""
+    return (
+        "grep -q '^root:' /etc/passwd || sed -i '1i root:x:0:0:root:/root:/bin/bash' /etc/passwd; "
+        "u=$$(id -u androidusr 2>/dev/null || echo 1300); g=$$(id -g androidusr 2>/dev/null || echo 1301); "
+        "G=$$(id -G androidusr 2>/dev/null | tr ' ' ',' || echo $$g); "
+        f"exec setpriv --reuid=$$u --regid=$$g --groups=$$G{extra} "
+        "env HOME=/home/androidusr USER=androidusr LOGNAME=androidusr \"$$APP_PATH/mixins/scripts/run.sh\""
+    )
+
+
+def is_docker_android(image: str) -> bool:
+    return image.split(":")[0].split("@")[0] in ("budtmo/docker-android", "docker.io/budtmo/docker-android")
 
 
 def emulator_cores(e: Emulator) -> int | None:
@@ -72,6 +96,9 @@ def build(stack: Stack, existing: set[str]) -> tuple[dict, list[str], list[str]]
             + [f"{k}={v}" for k, v in emulator_env(e).items()],
             "volumes": [f"{e.name}-data:/home/androidusr"],
         }
+        if e.restart_fix and is_docker_android(e.image):
+            svc["user"] = "0:0"
+            svc["entrypoint"] = ["/bin/sh", "-c", budtmo_start(kvm_gid)]
         # Der Emulator läuft im Container nicht als root: er braucht die Gruppe, der /dev/kvm auf dem Host gehört
         if kvm_gid is not None:
             svc["group_add"] = [str(kvm_gid)]
